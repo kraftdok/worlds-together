@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import ts from 'typescript';
+import {readFileSync} from 'node:fs';
+const module={exports:{}};
+vm.runInNewContext(ts.transpile(readFileSync(new URL('../lib/living-scene.ts',import.meta.url),'utf8'),{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}),{exports:module.exports});
+const {openingScene,scenePieces,applyScenePiece,sceneSources,sceneHasMissingSources}=module.exports;
+const room={id:'isolated-test',rev:0,members:[{user:'a',name:'Iris'},{user:'b',name:'Noa'}],state:{pieces:[{id:'source',title:'Lake',body:'Original setting',kind:'memory',media:'/lake-dawn.png',author:'Iris'},{id:'recording',title:'My rhythm',body:'A supplied recording',kind:'sound',media:'media:isolated-audio',author:'Noa'},{id:'perspective',title:'Another memory',body:'The train arrived twice.',kind:'imagination',author:'Noa'}],creations:[],agentProposals:[]}};
+const starting=openingScene(room);assert.equal(starting.frames[0].image,'source');assert.equal(starting.frames[0].sound,'recording');
+const pieces=scenePieces(room),frame=applyScenePiece(starting.frames[0],pieces[2]);assert.equal(frame.caption,'The train arrived twice.');assert.equal(starting.frames[0].caption,'');
+const sources=sceneSources([frame],['perspective']);assert.equal(new Set(sources).size,3);assert.equal(sceneHasMissingSources(room,[frame],sources),false);
+const withdrawn=structuredClone(room);withdrawn.state.pieces=withdrawn.state.pieces.filter(p=>p.id!=='recording');assert.equal(sceneHasMissingSources(withdrawn,[frame],sources),true);
+room.state.agentProposals.push({id:'pending',status:'proposed',draft:{frames:[{image:null,sound:null,caption:'Not approved',seconds:8}]}});assert.equal(openingScene(room).frames[0].image,'source','Pending AI work must not replace shared scene automatically');
+const saved={id:'first-scene',title:'Shared',by:'Iris',sources,frames:[frame]};room.state.creations.push(saved);const reopened=openingScene(room);assert.equal(reopened.parent.id,'first-scene');assert.equal(reopened.frames[0].caption,frame.caption);reopened.frames[0].caption='Local change';assert.equal(saved.frames[0].caption,frame.caption,'Local edits must not mutate saved versions');
+console.log('PASS: two contributors’ image, recording and words compose without mutation; source credits retained; withdrawal detected; pending AI is not auto-applied; saved scene restores independently. No API requests or persistent test records.');
+const route=readFileSync(new URL('../app/api/[...path]/route.ts',import.meta.url),'utf8');
+const assemble=ts.transpile(route.split('\n').find(l=>l.includes("else if(v.action==='assemble')")).trim().replace(/^else /,''),{target:ts.ScriptTarget.ES2022});
+function simulate(credits){const state={pieces:room.state.pieces,creations:[],events:[]};vm.runInNewContext(assemble,{v:{action:'assemble',title:'Isolated assembly',frames:[frame],sources:credits,note:'Test'},state,user:{displayName:'Iris'},crypto:{randomUUID:()=> 'isolated-version'},checkedFrames:v=>v,string:v=>v,event:()=>{},fail:message=>{throw Error(message);}});return state;}
+assert(simulate(['perspective']).creations[0].sources.includes('perspective'),'Text source credit must survive a saved arrangement');
+assert.throws(()=>simulate(['private-not-shared']),/current shared pieces/);
+assert.throws(()=>simulate([42]),/current shared pieces/);
+console.log('PASS: actual assemble handler keeps explicit text credit and rejects unshared/invalid source IDs (isolated handler execution).');

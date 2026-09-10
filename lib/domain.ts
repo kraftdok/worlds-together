@@ -1,9 +1,11 @@
 export type Kind='story'|'fan'|'music'|'athlete'|'city'|'purpose';
 export type Invitation='create'|'connect'|'experience';
 export type Piece={id:string;title:string;body:string;kind:string;media?:string|null;author?:string;owner?:string;sample?:boolean};
-export type Creation={id:string;title:string;body:string;reason:string;sources:string[];mode:'live'|'sample'|'human';parent?:string;by:string;featured?:boolean;media?:string;mediaKind?:'image'|'sound'};
+export type Frame={image:string|null;sound:string|null;caption:string;seconds:number};
+export type Creation={id:string;title:string;body:string;reason:string;sources:string[];mode:'live'|'sample'|'human';parent?:string;by:string;featured?:boolean;media?:string;mediaKind?:'image'|'sound';frames?:Frame[];agent?:{principal:string;name:string;approvedBy:string}};
+export type AgentProposal={id:string;principal:string;name:string;task:string;sourceIds:string[];draft:Creation;status:'proposed'|'accepted'|'declined';createdAt:string};
 export type ActivityRequest={id:string;creation:string;user:string;name:string;message:string;status:'requested'|'answered'|'accepted'|'declined'|'reported';reply?:string;outcome?:string;at:string};
-export type State={pieces:Piece[];creations:Creation[];events:{text:string;at:string}[];operations:string[];activityRequests?:ActivityRequest[];invitation?:Invitation};
+export type State={pieces:Piece[];creations:Creation[];events:{text:string;at:string}[];operations:string[];activityRequests?:ActivityRequest[];invitation?:Invitation;agentProposals?:AgentProposal[]};
 export type Room={id:string;owner:boolean;kind:Kind;rev:number;state:State;members:{name:string;user:string}[];requests?:{name:string;user:string}[]};
 export const worlds:Record<Kind,{title:string;label:string;question:string;source:string;sample:Piece}>={
  fan:{title:'How we begin',label:'ATHLETE / FAN PARTICIPATION',question:'What does your first five minutes look or sound like?',source:'Original fictional athlete invitation from runner Jules Morrow: share an image, sound, sketch, movement idea or personal ritual about beginning. Fans can create a collective response, propose a new format, or collaborate. This is not an invitation to impersonate an athlete, use protected material, or claim endorsement. Contributions remain community work unless explicitly featured, which does not grant commercial reuse rights.',sample:{id:'sample-fan',title:'The rhythm of getting ready',body:'I would contribute a 20-second rhythm made from tying shoes and footsteps. Someone else could answer with a photograph or movement sequence.',kind:'offer',author:'Alex · fictional sample',sample:true}},
@@ -14,7 +16,7 @@ export const worlds:Record<Kind,{title:string;label:string;question:string;sourc
  purpose:{title:'What comes next',label:'COMMUNITY / SOMETHING TO BECOME',question:'What are you trying to make possible?',source:'Original professional community. People share a goal or an actual offer of help, discover a useful connection, and may develop something together. Do not infer commitments or share patient, employment-sensitive or confidential information.',sample:{id:'sample-purpose',title:'A useful first conversation',body:'I have hosted peer-feedback groups. People brought one concrete question and left with a next step. I can share the structure, but a date or mentoring relationship would need agreement.',kind:'offer',author:'Rene · fictional sample',sample:true}}
 };
 export const samplePieces:Piece[]=[
- {id:'demo-1',title:'The in-between places',body:'Stations, hotel lobbies, the walk home. I’m drawn to the places where people are on their way to becoming something else.',kind:'memory',media:'/world-city.png',sample:true},
+ {id:'demo-1',title:'The in-between places',body:'Stations, hotel lobbies, the walk home. I’m drawn to the places where people are on their way to becoming something else.',kind:'memory',media:'/lake-dawn.png',sample:true},
  {id:'demo-2',title:'A story you can step into',body:'I want to make a story that changes when someone brings their own perspective. Two people could inhabit the same scene differently.',kind:'imagination',sample:true},
  {id:'demo-3',title:'What hands remember',body:'Sketchbooks, materials, and the knowledge people hold in their hands. I love learning how an object was made.',kind:'curiosity',media:'/sketchbook.png',sample:true},
  {id:'demo-4',title:'Before everyone wakes',body:'There is a different city in the early morning. I like walking without a destination and listening.',kind:'memory',media:'/track.png',sample:true},
@@ -23,4 +25,13 @@ export const samplePieces:Piece[]=[
 ];
 export function initial(kind:Kind,sample:boolean):State{return {pieces:[{id:'source',title:worlds[kind].title,body:worlds[kind].source,kind:'original source',author:'Worlds Together'},...(sample?[worlds[kind].sample]:[])],creations:[],events:[{text:'A new shared world opened.',at:new Date().toISOString()}],operations:[]};}
 export function validateSelection(v:any,available:Piece[]){if(!Array.isArray(v?.selections)||v.selections.length>6)throw new Error('The selection was incomplete. Try again.');return v.selections.map((s:any)=>{if(!available.some(p=>p.id===s.id)||typeof s.reason!=='string'||s.reason.length>1000)throw new Error('The model returned an unknown piece. Nothing was shared.');return {id:s.id,reason:s.reason};});}
-export function validateCreation(v:any,pieces:Piece[]){for(const key of ['title','body','reason'])if(typeof v?.[key]!=='string'||!v[key].trim()||v[key].length>10000)throw new Error('The suggestion was incomplete. Your work is safe.');if(!Array.isArray(v.sources)||v.sources.length<2||v.sources.some((id:unknown)=>!pieces.some(p=>p.id===id)))throw new Error('The suggestion could not be grounded in the supplied sources.');return {title:v.title as string,body:v.body as string,reason:v.reason as string,sources:[...new Set(v.sources)] as string[]};}
+export function validateCreation(v:any,pieces:Piece[]){for(const key of ['title','body','reason'])if(typeof v?.[key]!=='string'||!v[key].trim()||v[key].length>10000)throw new Error('The suggestion was incomplete. Your work is safe.');if(!Array.isArray(v.sources)||new Set(v.sources).size<2||v.sources.some((id:unknown)=>!pieces.some(p=>p.id===id)))throw new Error('The suggestion could not be grounded in the supplied sources.');return {title:v.title as string,body:v.body as string,reason:v.reason as string,sources:[...new Set(v.sources)] as string[]};}
+export function validateFrames(value:unknown,pieces:Piece[]):Frame[]{
+ if(!Array.isArray(value)||value.length<1||value.length>12)throw new Error('Use 1–12 moments.');
+ return value.map(f=>{
+  if(!f||typeof f.caption!=='string'||f.caption.length>500||!Number.isInteger(f.seconds)||f.seconds<2||f.seconds>30)throw new Error('Each moment needs 2–30 seconds and a caption under 500 characters.');
+  for(const key of ['image','sound'] as const){if(f[key]!==null){const p=pieces.find(p=>p.id===f[key]);if(!p?.media||(key==='sound')!==(p.kind==='sound'))throw new Error('Choose media already shared in this room.');}}
+  if(!f.image&&!f.sound&&!f.caption.trim())throw new Error('Add an image, sound or caption to each moment.');
+  return {image:f.image,sound:f.sound,caption:f.caption,seconds:f.seconds};
+ });
+}

@@ -1,0 +1,15 @@
+'use client';
+import EditableText from './editable-text';
+import {useState} from 'react';
+import {Sparkles,Check,X,ShieldCheck} from 'lucide-react';
+import type {Room} from '@/lib/domain';
+export default function AgentCollaboration({room,user,busy,run,change}:{room:Room;user:string;busy:boolean;run:(task:string,ids:string[])=>Promise<void>;change:(action:Record<string,unknown>)=>Promise<unknown>}){
+ const [task,setTask]=useState(''),[ids,setIds]=useState<string[]>([]),[open,setOpen]=useState(false),[error,setError]=useState('');
+ const valid=ids.filter(id=>room.state.pieces.some(p=>p.id===id));
+ async function act(fn:()=>Promise<unknown>){setError('');try{await fn();}catch(e){setError((e as Error).message);}}
+ return <section className="agent-collaboration"><header><Sparkles size={24}/><div><p className="eyebrow">PEOPLE & THEIR AGENTS</p><h3>Another contribution. Your decision.</h3></div></header><p>Ask your agent to build on selected shared pieces. Its proposal appears here for everyone; only you can accept it as your contribution. It cannot share private context, book anything, or speak for another person.</p><button className="outline" onClick={()=>setOpen(!open)}>{open?'Close agent brief':'Brief my agent'}<Sparkles size={15}/></button>
+ {open&&<div className="agent-brief"><EditableText value={task} onChange={setTask} label="Agent brief" placeholder="What could your agent bring to this?" maxLength={1800} className="direct-body"/><p><ShieldCheck size={15}/> Only these shared pieces, plus recent shared versions whose sources are all selected, will be sent for this turn.</p><div className="agent-source-choices">{room.state.pieces.map(p=><button key={p.id} aria-pressed={valid.includes(p.id)} onClick={()=>setIds(x=>x.includes(p.id)?x.filter(id=>id!==p.id):[...x,p.id])}>{p.title}{valid.includes(p.id)&&<Check size={12}/>}</button>)}</div><button className="gold" disabled={busy||!task.trim()||valid.length<2} onClick={()=>act(async()=>{await run(task,valid);setTask('');setOpen(false);})}>{busy?'Preparing proposal…':'Ask my agent to propose'}</button><small>One bounded AI turn · at least two sources · text proposal, not generated media · uses the demo AI allowance</small></div>}
+ {error&&<p role="alert">{error}</p>}
+ <div className="agent-proposals">{room.state.agentProposals?.slice().reverse().map(p=><article key={p.id}><small>{p.name} · {p.status==='accepted'?'approved contribution':p.status==='declined'?'declined':'proposal, not approved'}</small><h4>{p.draft.title}</h4><p className="agent-draft">{p.draft.body}</p><p>{p.draft.reason}</p><div className="trace-chips">{p.sourceIds.map(id=><span key={id}>{room.state.pieces.find(x=>x.id===id)?.title||'Withdrawn source'}</span>)}</div>{p.status==='proposed'&&p.principal===user&&<div><button className="gold" disabled={busy} onClick={()=>act(()=>change({action:'agent-accept',id:p.id}))}><Check size={15}/> Accept as my contribution</button><button className="text-button" disabled={busy} onClick={()=>act(()=>change({action:'agent-decline',id:p.id}))}><X size={15}/> Decline</button></div>}</article>)}</div>
+ </section>;
+}

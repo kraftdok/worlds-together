@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {groundedSchema} from '../lib/grounded-schema.ts';
+const original={type:'object',properties:{sources:{type:'array',items:{type:'string'}},frames:{type:'array',items:{properties:{caption:{type:'string'}}}}}};
+const result=groundedSchema(original,{pieces:[{id:'a',hasMedia:true,kind:'memory'},{id:'b',hasMedia:true,kind:'sound'}]});
+assert.deepEqual(result.properties.sources.items.enum,['a','b']);
+assert.equal(result.properties.sources.minItems,2);
+assert.deepEqual(result.properties.frames.items.properties.image.enum,[null,'a']);
+assert.deepEqual(result.properties.frames.items.properties.sound.enum,[null,'b']);
+assert.equal(original.properties.sources.items.enum,undefined);
+console.log('PASS: source and media references constrained to permitted IDs; original schema unchanged');

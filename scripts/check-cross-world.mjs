@@ -1,0 +1,25 @@
+// Loopback only: synthetic identities, non-sensitive context, no remote writes.
+import assert from 'node:assert/strict';
+const origin='http://127.0.0.1:8877',tag=crypto.randomUUID().slice(0,8),a='discovery-a-'+tag,b='discovery-b-'+tag,c='discovery-c-'+tag;
+async function call(user,path,body,expected=200,method='POST'){const r=await fetch(origin+path,{method:body===undefined?'GET':method,headers:{origin,'content-type':'application/json',...(user?{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@example.test'}:{})},body:body===undefined?undefined:JSON.stringify(body)});const d=await r.json();assert.equal(r.status,expected,JSON.stringify(d));return d;}
+const discovery=(u,v,status)=>call(u,'/api/discovery',v,status);
+const add=(u,title,body)=>call(u,'/api/world',{action:'add',title,body,kind:'offer'});
+await discovery(null,undefined,401);
+const pa=await add(a,'Community questions','I work on improving research participation in women’s health. I can help formulate non-clinical questions and explain participant needs.');
+const hidden=await add(a,'Private family memory','PRIVATE_TEST_CONTEXT_MUST_NOT_TRAVEL');
+const pb=await add(b,'Study design collaborator','I design surveys and can help turn community research questions into a first draft questionnaire. No patient data is involved.');
+await discovery(a,{action:'publish',ids:[pb.id],rev:0},400);
+await discovery(a,{action:'publish',ids:[pa.id],rev:0});
+await discovery(b,{action:'publish',ids:[pb.id],rev:0});
+const d=await discovery(b);assert(!JSON.stringify(d).includes(hidden.id));assert(!JSON.stringify(d).includes('PRIVATE_TEST_CONTEXT_MUST_NOT_TRAVEL'));assert(d.people.some(p=>p.user===a));assert.equal((await call(a,'/api/world')).rooms.length,0);
+const invitation={action:'request',person:b,senderRev:1,recipientRev:1,yourPieces:[pa.id],theirPieces:[pb.id],project:'A community research question set',reason:'Community knowledge and survey design can complement one another.',firstStep:'Draft five non-clinical research-participation questions and explain the contribution from each person.'};
+await discovery(a,{...invitation,yourPieces:[hidden.id]},400);
+let out=await discovery(a,invitation);let req=out.requests[0];assert.equal(req.status,'pending');assert.equal((await call(a,'/api/world')).rooms.length,0);assert.equal((await call(b,'/api/world')).rooms.length,0);
+await discovery(a,{action:'accept',id:req.id},403);await discovery(c,{action:'accept',id:req.id},404);
+await discovery(a,invitation,409);
+const accepted=await Promise.all([discovery(b,{action:'accept',id:req.id}),discovery(b,{action:'accept',id:req.id})]);let room=accepted[0].room;assert.equal(accepted[1].room.id,room.id);assert.equal(room.members.length,2);assert.equal(room.state.creations.length,0);assert.deepEqual(room.state.pieces.filter(p=>p.id!=='source').map(p=>p.id).sort(),[pa.id,pb.id].sort());assert(!JSON.stringify(room).includes(hidden.id));assert(room.state.pieces.every(p=>!p.media));await call(c,'/api/rooms/'+room.id,undefined,404);assert.equal((await call(a,'/api/world')).rooms.length,1);
+out=await discovery(a,invitation);req=out.requests.find(r=>r.status==='pending');await discovery(b,{action:'publish',enabled:false,rev:1});await discovery(b,{action:'accept',id:req.id},409);assert(!(await discovery(a)).people.some(p=>p.user===b));assert.equal((await call(a,'/api/rooms/'+room.id)).members.length,2);
+await discovery(b,{action:'publish',ids:[pb.id],rev:2});out=await discovery(a,{...invitation,recipientRev:3});req=out.requests.find(r=>r.status==='pending');await discovery(b,{action:'decline',id:req.id});await discovery(b,{action:'accept',id:req.id},409);
+if(process.argv.includes('--live')){const match=await discovery(a,{action:'match',ids:[pa.id]});assert(match.connections.some(x=>x.person===b));assert(match.connections.every(x=>x.yourPieces.every(id=>id===pa.id)));const response=await call(a,'/api/ai',{action:'agent-propose',room:room.id,rev:room.rev,ids:[pa.id,pb.id],task:invitation.firstStep});room=response.room;assert.equal(room.state.creations.length,0);const proposal=room.state.agentProposals.at(-1);await call(b,'/api/rooms/'+room.id,{action:'agent-accept',id:proposal.id,rev:room.rev,operationId:crypto.randomUUID()},403,'PATCH');room=await call(a,'/api/rooms/'+room.id,{action:'agent-accept',id:proposal.id,rev:room.rev,operationId:crypto.randomUUID()},200,'PATCH');assert.equal(room.state.creations.length,1);}
+await discovery(a,{action:'publish',enabled:false,rev:1});await discovery(b,{action:'publish',enabled:false,rev:3});
+console.log(JSON.stringify({passed:true,live:process.argv.includes('--live'),checks:['discovery across accounts with no shared room','unselected context never disclosed','ownership enforced','no room before mutual consent','sender and stranger cannot accept','concurrent acceptance creates one room','exact selected text only','opt-out invalidates pending invitations','decline cannot be accepted','existing room retained on discovery opt-out',...(process.argv.includes('--live')?['live cross-world match','agent draft in mutually accepted room','only principal approves agent']:[])],room:room.id}));

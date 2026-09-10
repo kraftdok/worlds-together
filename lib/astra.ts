@@ -1,8 +1,12 @@
 import {runtime,fail,reserveCost} from './server';
+import {groundedSchema} from './grounded-schema';
 const text={type:'string'};
+export const connectionSchema={type:'object',properties:{connections:{type:'array',items:{type:'object',properties:{person:text,reason:text,project:text,firstStep:text,yourPieces:{type:'array',items:text},theirPieces:{type:'array',items:text}},required:['person','reason','project','firstStep','yourPieces','theirPieces'],additionalProperties:false}}},required:['connections'],additionalProperties:false};
 export const selectionSchema={type:'object',properties:{selections:{type:'array',items:{type:'object',properties:{id:text,reason:text},required:['id','reason'],additionalProperties:false}}},required:['selections'],additionalProperties:false};
 export const creationSchema={type:'object',properties:{title:text,body:text,reason:text,sources:{type:'array',items:text}},required:['title','body','reason','sources'],additionalProperties:false};
+export const arrangementSchema={...creationSchema,properties:{...creationSchema.properties,frames:{type:'array',items:{type:'object',properties:{image:{type:['string','null']},sound:{type:['string','null']},caption:text,seconds:{type:'integer'}},required:['image','sound','caption','seconds'],additionalProperties:false}}},required:[...creationSchema.required,'frames']};
 export async function astra(instructions:string,context:unknown,schema:object){
+ schema=groundedSchema(schema,context);
  const key=runtime().OPENAI_API_KEY;if(!key)fail('Add the server OpenAI key before using Astra. You can still share and write together.',503);
  const payload=JSON.stringify(context);const inputBytes=new TextEncoder().encode(payload+instructions+JSON.stringify(schema)).length;if(inputBytes>60000)fail('There is too much context for one request. Use a smaller room.');
  if(runtime().OPENAI_MODEL&&runtime().OPENAI_MODEL!=='gpt-6-astra')fail('The spending guard is configured for GPT-6 Astra only.',503);
