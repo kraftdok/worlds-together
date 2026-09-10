@@ -9,7 +9,10 @@ something together. Every creation keeps links to the pieces that shaped it.
 
 - Rotatable dimensional collection with image pieces and source traces.
 - Account-private text, image and audio contributions (matching uses descriptions).
-- Original fiction, fictional athlete, hospitality and professional-community rooms.
+- Original fiction, athlete/fan participation, music, hospitality and community rooms.
+- Independently selectable invitations: create/contribute, connect/collaborate, or join an experience.
+- Original image and audio responses, with credit and links to the version they build on.
+- Host request → answer → participant acceptance → participant-reported return.
 - Private Astra selection, explicit sharing, source-linked generation, human branches.
 - Room-owner approval for join requests, invitation replacement and access removal.
 - Durable shared state with polling and revision conflict detection.
@@ -89,7 +92,7 @@ The test's synthetic identity headers must never be trusted on a directly public
 The runtime adapter is Cloudflare D1/R2 plus Sites dispatch-owned ChatGPT authentication.
 The business types live in `lib/domain.ts`; identity/storage guards in `lib/server.ts`;
 model integration in `lib/astra.ts`; the UI is under `components/`.
-The fresh app does not import any private Troviii source or customer decks.
+The fresh app does not import any private product source or customer decks.
 
 For a different host, replace the identity adapter with verified sessions and provision
 the DB and BUCKET bindings. Never expose the raw Worker publicly while trusting client-
