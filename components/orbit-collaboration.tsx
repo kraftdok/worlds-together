@@ -6,6 +6,7 @@ import ContributionComposer from './contribution-composer';
 import EditableText from './editable-text';
 import ActivityActions from './activity-actions';
 import {mediaUrl} from './encounter-scene';
+import {deliverables,firstDeliverable,exportContribution} from '@/lib/first-deliverable';
 
 export default function OrbitCollaboration({room,user,current,onSelect,onClose,onSource,onContext,change,run}:{onContext:()=>void;room:Room;user:string;current:string|null;onSelect:(id:string|null)=>void;onClose:()=>void;onSource:(ids:string[])=>void;change:(v:Record<string,unknown>)=>Promise<Room>;run:(task:string,ids:string[],arrange:boolean,parent?:string)=>Promise<void>}){
  const [mode,setMode]=useState<'view'|'respond'|'agent'|'trace'>('view'),[brief,setBrief]=useState(''),[ids,setIds]=useState<string[]>(['source']),[error,setError]=useState(''),[busy,setBusy]=useState(false),[playing,setPlaying]=useState(false),[frame,setFrame]=useState(0);
@@ -14,6 +15,8 @@ export default function OrbitCollaboration({room,user,current,onSelect,onClose,o
  useEffect(()=>{if(room.rev>previousRevision.current){setUpdate(room.state.events.at(-1)?.text||'New work arrived.');previousRevision.current=room.rev;}},[room.rev]);
  const work=room.state.creations.find(c=>c.id===current),proposal=room.state.agentProposals?.find(p=>p.id===current&&p.status==='proposed');
  const shown=work||proposal?.draft,source=room.state.pieces.find(p=>p.id==='source');
+ const practical=room.state.invitation==='connect'||room.state.invitation==='experience';
+ function downloadDraft(){if(!shown)return;const url=URL.createObjectURL(new Blob([exportContribution(shown,room.state.pieces,!!proposal)],{type:'text/markdown;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='worlds-together-draft.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  const parent=work?.parent?room.state.creations.find(c=>c.id===work.parent):undefined;
  const frames=shown?.frames,shot=frames?.[frame];
  function beginAgent(){
@@ -39,6 +42,7 @@ export default function OrbitCollaboration({room,user,current,onSelect,onClose,o
   {update&&<p className="journey-update" role="status">{update}</p>}
   {mode==='trace'?<><button className="orbit-back" onClick={()=>setMode('view')}><ArrowLeft size={16}/> Back to the creation</button><h2>What each piece changed.</h2><p className="orbit-work-text">{shown?.reason}</p>{room.state.pieces.filter(p=>shown?.sources.includes(p.id)).map(p=><article className="spatial-piece-review" key={p.id}><h3>{p.title}</h3><small>{p.author}</small><p>{p.body}</p></article>)}</>:mode==='respond'?<><button className="orbit-back" onClick={()=>setMode('view')}><ArrowLeft size={14}/> {shown?'Back to this contribution':'Back to the invitation'}</button><ContributionComposer parent={work?.id} sources={work?.sources||['source']} change={async v=>{const next=await change(v);setMode('view');onSelect(next.state.creations.at(-1)!.id);return next;}}/></>:mode==='agent'?<>
    <div className="orbit-agent-heading"><Sparkles size={25}/><span>Ask your agent to help</span></div><p className="orbit-disclosure">Your agent uses the shared pieces below—not your whole private world.</p><button className="text-button" disabled={busy} onClick={onContext}><Plus size={16}/> Choose from my context</button>
+   {practical&&<div className="deliverable-choices"><h3>What would make this connection useful today?</h3>{deliverables.map(d=><button key={d.id} disabled={busy} onClick={()=>setBrief(firstDeliverable(d.id,source?.body||''))}><strong>{d.label}</strong><span>{d.detail}</span><ArrowRight size={17}/></button>)}</div>}
    <EditableText value={brief} onChange={setBrief} label="Brief your agent" placeholder={room.kind==='story'?'What could exist just beyond this scene?':room.kind==='fan'?'What could these fan contributions become together?':'What could we make from these pieces?'} maxLength={1800} className="direct-body"/>
    <div className="orbit-source-pieces">{room.state.pieces.map(p=><button key={p.id} aria-pressed={ids.includes(p.id)} onClick={()=>setIds(s=>s.includes(p.id)?s.filter(id=>id!==p.id):[...s,p.id])}>{p.media&&p.kind!=='sound'?<img src={mediaUrl(p,room)} alt=""/>:<Music size={16}/>}<span>{p.title}</span>{ids.includes(p.id)&&<Check size={12}/>}</button>)}</div>
    <p className="orbit-disclosure">Only these selected shared pieces and source-covered versions go to the model. The room sees its proposal; you decide whether to accept it.</p>
@@ -52,7 +56,7 @@ export default function OrbitCollaboration({room,user,current,onSelect,onClose,o
    <h2>{shown?.title||source?.title}</h2><p className="orbit-work-text">{shown?.body||source?.body}</p>
    {parent&&<button className="orbit-parent" onClick={()=>onSelect(parent.id)}><GitBranch size={14}/> Grew from {parent.title}</button>}
    {shown&&<div className="orbit-credit">{shown.sources.map(id=><span key={id}>{room.state.pieces.find(p=>p.id===id)?.title||'Withdrawn source'}</span>)}</div>}
-   {shown&&<button className="orbit-parent" onClick={()=>setMode("trace")}><GitBranch size={15}/> See what each piece changed</button>}
+   {shown&&<><button className="orbit-parent" onClick={()=>setMode("trace")}><GitBranch size={15}/> See what each piece changed</button><button className="orbit-parent" onClick={downloadDraft}>Download {proposal?'unapproved proposal':'draft'} with source credits <ArrowRight size={15}/></button></>}
    {proposal?<><p className="orbit-disclosure">Your agent’s draft is saved. Keep it to build on it together, or decline it. Agent credit is retained.</p>{proposal.principal===user?<div className="orbit-inline-actions"><button disabled={busy} onClick={()=>act(async()=>{await change({action:'agent-accept',id:proposal.id});onSelect(proposal.draft.id);})}><Check size={15}/> Keep this draft</button><button disabled={busy} onClick={()=>act(async()=>{await change({action:'agent-decline',id:proposal.id});onSelect(null);})}>Decline</button></div>:<small>Waiting for {proposal.name}’s owner to decide.</small>}</>:<div className="orbit-inline-actions"><button onClick={()=>setMode('respond')}><Plus size={16}/>{shown?'Build on this':'Answer this invitation'}</button><button onClick={onContext}>Choose from my context</button><button onClick={()=>{beginAgent();}}><Sparkles size={16}/> Ask your agent</button></div>}
   </>}
   {mode==='view'&&work&&room.state.invitation&&room.state.invitation!=='create'&&<><button className="orbit-back" onClick={()=>setFollowThrough(!followThrough)}>{followThrough?'Return to the creation':'Take this into the real world'} <ArrowRight size={14}/></button>{followThrough&&<ActivityActions room={room} creation={work} user={user} change={change}/>}</>}

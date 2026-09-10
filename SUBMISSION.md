@@ -10,7 +10,7 @@ Oriana Kraft (kraftdok)
 
 ## Project description
 
-Worlds Together turns pieces of people's lives and imagination into things they can make together. Bring words, images and recordings into a private world, choose what can be discovered, and use AI to find complementary contributions, not just similar profiles. Mutual acceptance opens a shared space. People and their permissioned AI collaborators can compose scenes, contribute responses and build on previous versions, preserving sources and authorship.
+Worlds Together is multiplayer AI for finding the contribution you are missing, then starting useful work together. People bring knowledge, interests and imagination into a private world and choose what others may discover. AI looks for complementary contributions, not merely common interests. Both people approve before their selected context enters a shared space. They can refine the first task, ask an agent for a project brief, research questions or an experience concept, and review or download the source-credited draft. Creative participation has a separate path: fans combine words, images and sound into evolving shared worlds.
 
 The prototype combines spatial worlds, opt-in matching, multiplayer shared state and human-approved AI arrangements. Fiction, music and athlete/fan participation are creative entry points; the same foundation can support real-world collaboration. The demo uses clearly labelled sample contributions and supplied media.
 
