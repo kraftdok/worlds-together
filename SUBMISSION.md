@@ -18,11 +18,11 @@ The prototype combines spatial worlds, opt-in matching, multiplayer shared state
 
 https://github.com/kraftdok/worlds-together
 
-Before submitting: verify public visibility and push the latest local implementation.
+Public visibility verified. The implementation was pushed to main at commit 6f09011.
 
 ## One-minute demo video
 
-Upload the accompanying MP4 to a video host accepted by the submission form, then paste its shareable URL. A local file path is not a public video link.
+The accompanying `outputs/worlds-together-demo.mp4` is exactly 60 seconds, with synthetic narration. Upload it to a video host accepted by the submission form, then paste its shareable URL. A local file path is not a public video link.
 
 ## Use of OpenAI products during development
 
